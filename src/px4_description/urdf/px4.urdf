@@ -1,0 +1,47 @@
+<?xml version="1.0"?>
+<robot name="PX4_orientation">
+
+  <material name="red">
+    <color rgba="0.8 0 0 1"/>
+  </material>
+  <material name="white">
+    <color rgba="1 1 1 1"/>
+  </material>
+
+  <link name="map">
+  </link>
+
+  <joint name="world_to_box" type="fixed">
+    <parent link="map"/>
+    <child link="box"/>
+    <origin xyz="0.0 0.0 0"/>
+  </joint>
+
+  <link name="box">
+    <visual>
+      <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <box size = "1.8 1 0.25"/>
+      </geometry>
+      <material name="white"/>
+    </visual>
+  </link>
+
+  <joint name="box_to_arrow" type="fixed">
+    <parent link="box"/>
+    <child link="arrow"/>
+    <origin xyz="0.0 0.0 0"/>
+  </joint>
+
+  <link name = "arrow">
+    <visual>
+      <geometry>
+        <box size = "0.5 0.5 0.2"/>
+      </geometry>
+      <origin xyz="0.9 0 0.1" rpy="0 0 0.7854"/>
+      <material name="red"/>
+    </visual>
+  </link>
+    
+
+</robot>

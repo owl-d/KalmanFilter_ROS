@@ -1,0 +1,2 @@
+kalman_tracking:px4_description
+-DCATKIN_DEVEL_PREFIX=/home/doyu/Kalman/catkin_ws/devel -DCMAKE_INSTALL_PREFIX=/home/doyu/Kalman/catkin_ws/install -G Unix Makefiles
