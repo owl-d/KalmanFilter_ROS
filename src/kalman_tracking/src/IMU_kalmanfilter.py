@@ -2,7 +2,7 @@
 
 import rospy
 from sensor_msgs.msg import Imu, MagneticField, Temperature
-from geometry_msgs.msg import Vector3, PoseStamped, Quaternion, TransformStamped
+from geometry_msgs.msg import Vector3, PoseStamped, Twist, TransformStamped
 from visualization_msgs.msg import Marker
 from tf.transformations import euler_from_quaternion, quaternion_from_euler, quaternion_multiply
 import numpy as np
@@ -12,18 +12,26 @@ import sys
 import rospy
 import tf_conversions
 import tf2_ros
-from pyquaternion import Quaternion
 
 class Algorithm(object):
 
     def __init__(self):
         self._imu_sub = rospy.Subscriber("mavros/imu/data_raw", Imu, self.CallBack)
         self._mag_sub = rospy.Subscriber("mavros/imu/mag", MagneticField, self.MagCallBack)
-        self._pub = rospy.Publisher("orientation", PoseStamped, queue_size = 10)
+        self.pose_pub = rospy.Publisher("pose", PoseStamped, queue_size = 10)
+        self.velocity_pub = rospy.Publisher("velocity", Twist, queue_size = 10)
         self._pose = PoseStamped()
+        self._velocity = Twist()
         self._gyro = Vector3()
         self._acc = Vector3()
         self._mag = Vector3()
+
+        self.body_v_x = 0
+        self.body_v_y = 0 #velocity
+        self.local_v_x = 0
+        self.local_v_y = 0
+        self.local_p_x = 0
+        self.local_p_y = 0 #position
         
         self._dt = 0.02
         self._H = np.zeros((3,4))
@@ -61,7 +69,8 @@ class Algorithm(object):
         qe1 = self._K.dot(self._z1 - self._h)
         qe1[3][0] = 0
         q1 = self._xp + qe1
-        P1 = self._Pp.dot(I - self._K.dot(self._H))
+        temp = I - self._K.dot(self._H)
+        P1 = temp.dot(self._Pp)
 
         #Correction Stage2 : with mag
         self.create_H2()
@@ -70,25 +79,54 @@ class Algorithm(object):
         qe2[1][0] = 0
         qe2[2][0] = 0
         self._x = q1 + qe2
-        self._P = P1.dot(I - self._K.dot(self._H))
+        temp = I - self._K.dot(self._H)
+        self._P = temp.dot(P1)
 
         #output(normalization)
-        quat = Quaternion(np.array([self._x[1][0], self._x[2][0], self._x[3][0], self._x[0][0]]))
-        quat = quat.normalised
+        Q_abs = math.sqrt(self._x[0][0]**2 + self._x[1][0]**2 + self._x[2][0]**2 + self._x[3][0]**2)
+        self._x = self._x/Q_abs
+        self.getposition()
 
-        self._pose.pose.orientation.x = quat[0]
-        self._pose.pose.orientation.y = quat[1]
-        self._pose.pose.orientation.z = quat[2]
-        self._pose.pose.orientation.w = quat[3]
-
+        self._pose.pose.position.x = self.local_p_x
+        self._pose.pose.position.y = self.local_p_y
+        self._pose.pose.position.z = 0
+        self._pose.pose.orientation.w = self._x[0][0]
+        self._pose.pose.orientation.x = self._x[1][0]
+        self._pose.pose.orientation.y = self._x[2][0]
+        self._pose.pose.orientation.z = self._x[3][0]
         self._pose.header.stamp = rospy.Time.now()
         self._pose.header.frame_id = "map"
-        self._pub.publish(self._pose)
+        self.pose_pub.publish(self._pose)
+
+        self._velocity.linear.x = self.body_v_x
+        self._velocity.linear.y = self.body_v_y
+        self._velocity.linear.z = 0
+        self._velocity.angular.x = self._gyro.x
+        self._velocity.angular.y = self._gyro.y
+        self._velocity.angular.z = self._gyro.z
+        self.velocity_pub.publish(self._velocity)
+
 
     def MagCallBack(self, msg):
         self._mag.x = msg.magnetic_field.x
         self._mag.y = msg.magnetic_field.y
         self._mag.z = msg.magnetic_field.z
+
+    def getposition(self):
+        quat = [self._x[0][0], self._x[1][0], self._x[2][0], self._x[3][0]]
+        _, _, yaw = euler_from_quaternion(quat)
+
+        local_acc_x = math.cos(yaw)*self._acc.x - math.sin(yaw)*self._acc.y
+        local_acc_y = math.sin(yaw)*self._acc.x + math.cos(yaw)*self._acc.y
+        self.body_v_x += self._acc.x*self._dt
+        self.body_v_y += self._acc.y*self._dt #velocity
+        self.local_v_x += local_acc_x*self._dt
+        self.local_v_y += local_acc_y*self._dt
+        self.local_p_x += self.local_v_x*self._dt/2
+        self.local_p_y += self.local_v_y*self._dt/2 #position
+        
+        # self.local_p_x += local_acc_x*self._dt*self._dt/2
+        # self.local_p_y += local_acc_y*self._dt*self._dt/2
 
     def create_A(self) :
         #A

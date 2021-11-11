@@ -17,10 +17,14 @@ def callBack(msg):
     t.transform.rotation.y = msg.pose.orientation.y
     t.transform.rotation.z = msg.pose.orientation.z
     t.transform.rotation.w = msg.pose.orientation.w
+    t.transform.translation.x = msg.pose.position.x
+    t.transform.translation.y = msg.pose.position.y
+    t.transform.translation.z = msg.pose.position.z
+
 
     br.sendTransform(t)
 
 if __name__ == '__main__':
       rospy.init_node('tf_broadcaster_imu')
-      rospy.Subscriber('/orientation', PoseStamped, callBack)
+      rospy.Subscriber('/pose', PoseStamped, callBack)
       rospy.spin()
