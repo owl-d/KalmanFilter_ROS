@@ -1,7 +1,6 @@
 <launch>
   
-  <node pkg="kalman_tracking" type="IMU_kalmanfilter.py" name="kalman_IMU" />
-  <node pkg="kalman_tracking" type="tf_broadcaster.py" name="tf_broadcaster_imu" />
+  <node pkg="kalman_tracking" type="kalman.py" name="kalman_IMU" />
 
   <arg name="model" default="$(find px4_description)/urdf/px4.urdf"/>
   <arg name="gui" default="true" />
